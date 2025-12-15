@@ -3,7 +3,7 @@ services:
     restart: always
     image: pixobe.com/shopify-coloring:${APP_VERSION}
     ports:
-      - 3004:3000
+      - 3001:3000
     environment:
       - SHOPIFY_API_KEY=${SHOPIFY_API_KEY}
       - SHOPIFY_API_SECRET=${SHOPIFY_API_SECRET}

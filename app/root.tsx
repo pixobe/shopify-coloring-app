@@ -11,6 +11,7 @@ export default function App() {
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
+        <script src="https://dev.coloring-app.pages.dev/colorgizer/coloring-app.esm.js" type="module" async></script>
         <Meta />
         <Links />
       </head>

@@ -1,0 +1,21 @@
+<script src="https://dev.coloring-app.pages.dev/colorgizer/coloring-app.esm.js" type="module" async></script>
+<script src="{{ 'main.js' | asset_url }}" async></script>
+{{ 'main.css' | asset_url | stylesheet_tag }}
+
+{% assign src = block.settings.src | image_url: width: 1080 %}
+{% if src %}
+  {% render 'coloring', src: src %}
+{% else %}
+  <div style="padding:1rem; box-sizing:border-box;text-align: center; border:1px dotted #3b82f6;border-radius:8px;background-color:#eff6ff;margin:10px 0;">
+    <h3 style="font-weight:bold">Image not selected</h3>
+    <p>Please choose image from app blocks.</p>
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Coloring Canvas",
+  "target": "section",
+  "settings": [{ "type": "image_picker", "id": "src", "label": "Choose Image" }]
+}
+{% endschema %}

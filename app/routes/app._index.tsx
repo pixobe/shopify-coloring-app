@@ -1,91 +1,61 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import { formDataToJson } from "app/utils/utilis";
+import { createLoadColoringSettings, createSaveColoringSettings } from "app/utils/graphql/config-metaobject";
+
+type SettingsDictionary = Record<string, unknown>;
+const CHECKBOX_FIELDS = [
+  "paint",
+  "pencil",
+  "zoom",
+  "print",
+  "download",
+  "brightness",
+] as const;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-
-  return null;
+  const { admin } = await authenticate.admin(request);
+  const loadSettings = createLoadColoringSettings(admin);
+  return loadSettings();
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
+  const formData = await request.formData();
+  const configEntries = Array.from(formData.entries()).map(([key, value]) => {
+    if (value === "on" || value === "true") {
+      return [key, true];
+    }
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
+    if (value === "false") {
+      return [key, false];
+    }
 
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
+    return [key, value];
+  });
+  const config = Object.fromEntries(configEntries);
+  const saveSettings = createSaveColoringSettings(admin);
+  const result = await saveSettings(config);
 
-  const variantResponseJson = await variantResponse.json();
-
-  return {
-    product: responseJson!.data!.productCreate!.product,
-    variant:
-      variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
-  };
+  return result;
 };
 
 export default function Index() {
-  const fetcher = useFetcher<typeof action>();
+  const settings = useLoaderData<typeof loader>();
+
+  const fetcher = useFetcher<{
+    success?: boolean;
+    config?: Record<string, unknown>;
+    message?: string;
+  }>();
 
   const shopify = useAppBridge();
   const isLoading =
@@ -93,157 +63,197 @@ export default function Index() {
     fetcher.formMethod === "POST";
 
   useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
+    if (fetcher.data?.config) {
+      shopify.toast.show("Settings updated");
     }
-  }, [fetcher.data?.product?.id, shopify]);
+  }, [fetcher.data, shopify]);
 
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const loaderConfig = useMemo(() => {
+    if (
+      settings?.success &&
+      typeof settings.config === "object" &&
+      settings.config !== null
+    ) {
+      return settings.config as SettingsDictionary;
+    }
+    return null;
+  }, [settings]);
+
+  const savedConfig = useMemo(() => {
+    if (
+      fetcher.data &&
+      fetcher.data.success &&
+      typeof fetcher.data.config === "object" &&
+      fetcher.data.config !== null
+    ) {
+      return fetcher.data.config as SettingsDictionary;
+    }
+    return null;
+  }, [fetcher.data]);
+
+  const currentConfig = useMemo<SettingsDictionary>(() => {
+    if (savedConfig) {
+      return savedConfig;
+    }
+
+    if (loaderConfig) {
+      return loaderConfig;
+    }
+
+    return {};
+  }, [loaderConfig, savedConfig]);
+
+  const applyConfigToForm = useCallback(
+    (nextConfig: SettingsDictionary | null) => {
+      if (!formRef.current) {
+        return;
+      }
+
+      const formElement = formRef.current;
+
+      CHECKBOX_FIELDS.forEach((fieldName) => {
+        const checkbox = formElement.querySelector(`[name="${fieldName}"]`) as
+          | (HTMLElement & { checked?: boolean })
+          | null;
+        if (!checkbox) {
+          return;
+        }
+
+        const shouldCheck = Boolean(nextConfig?.[fieldName]);
+        if (shouldCheck) {
+          checkbox.setAttribute("checked", "");
+        } else {
+          checkbox.removeAttribute("checked");
+        }
+
+        if ("checked" in checkbox) {
+          (checkbox as { checked?: boolean }).checked = shouldCheck;
+        }
+      });
+
+      const colorsField = formElement.querySelector('[name="colors"]') as
+        | (HTMLElement & { value?: string })
+        | null;
+      if (colorsField) {
+        const rawValue = nextConfig?.["colors"];
+        const colorsValue = typeof rawValue === "string" ? rawValue : "";
+        colorsField.setAttribute("value", colorsValue);
+
+        if ("value" in colorsField) {
+          (colorsField as { value?: string }).value = colorsValue;
+        }
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    applyConfigToForm(loaderConfig);
+  }, [applyConfigToForm, loaderConfig]);
+
+  useEffect(() => {
+    if (savedConfig) {
+      applyConfigToForm(savedConfig);
+    }
+  }, [applyConfigToForm, savedConfig]);
+
+  const rawColors = currentConfig["colors"];
+  const colorsValue = typeof rawColors === "string" ? rawColors : "";
+
+  const saveSettings = () => {
+    const data = formDataToJson(new FormData(formRef.current!));
+    const config = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => {
+        if (v === "on" || v === "true") {
+          return [k, true];
+        }
+
+        if (v === "false") {
+          return [k, false];
+        }
+
+        return [k, v];
+      }),
+    );
+
+    if (formRef.current) {
+      fetcher.submit(config, { method: "POST" });
+    }
+  };
 
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
-      </s-button>
+    <s-page heading="Pixobe Coloring Book">
 
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
-        <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
-          >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
-        </s-paragraph>
+      <s-section heading="Getting Started">
+        <s-ordered-list>
+          <s-list-item>Open the Theme Editor.</s-list-item>
+          <s-list-item>Select <strong>Add App</strong> from the left panel.</s-list-item>
+          <s-list-item>Choose the <strong>Coloring Book</strong> application and place it where you want the coloring canvas to appear.</s-list-item>
+          <s-list-item>
+            Select an image using the Image Picker for users to color in the block settings, then save the page.
+          </s-list-item>
+        </s-ordered-list>
       </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
+
+      <s-section heading="Coloring Settings">
+        <form ref={formRef}>
+          <s-grid
+            gridTemplateColumns="repeat(2, 1fr)"
+            gap="small"
           >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references.
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
+            <s-grid-item>
+              <s-paragraph>
+                Enable or disable individual tools available to users.
+              </s-paragraph>
+              <s-stack>
+                <p-checkbox
+                  label="Paint"
+                  name="paint"
+                  value={settings?.config?.paint}
+                />
+                <p-checkbox
+                  label="Pencil"
+                  name="pencil"
+                  value={settings?.config?.pencil}
+                />
+                <p-checkbox
+                  label="Zoom"
+                  name="zoom"
+                  value={settings?.config?.zoom}
+                />
+                <p-checkbox
+                  label="Print"
+                  name="print"
+                  value={settings?.config?.print}
+                />
+                <p-checkbox
+                  label="Download"
+                  name="download"
+                  value={settings?.config?.download}
+                />
+                <p-checkbox
+                  label="Brightness"
+                  name="brightness"
+                  value={settings?.config?.brightness}
+                />
+              </s-stack>
+            </s-grid-item>
+            <s-grid-item>
+              <s-text tone="auto">These colors will be available on the coloring canvas.</s-text>
+              <p-colorswatch label="Colors" name="colors" value={colorsValue}></p-colorswatch>
+            </s-grid-item>
+          </s-grid>
           <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
+            variant="primary"
+            onClick={saveSettings}
+            disabled={isLoading}
           >
-            Generate a product
+            Save Settings
+            {isLoading && <s-spinner></s-spinner>}
           </s-button>
-          {fetcher.data?.product && (
-            <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
-            >
-              Edit product
-            </s-button>
-          )}
-        </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
-            </s-stack>
-          </s-section>
-        )}
-      </s-section>
-
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
-      </s-section>
-
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
-          <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
-            >
-              example app
-            </s-link>
-          </s-list-item>
-          <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
-          </s-list-item>
-        </s-unordered-list>
+        </form>
       </s-section>
     </s-page>
   );
@@ -252,3 +262,4 @@ export default function Index() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+

@@ -1,28 +1,52 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "db3852f6280ca8fa87ff24a5b65a24eb"
-name = "coloring-app-stage"
-application_url = "https://example.com"
+name = "Pixobe Coloring"
+client_id = "85deee8bd5bf18a344916cd6acd3f9fd"
+application_url = "https://coloring.pixobe.com/"
 embedded = true
-
-[build]
-automatically_update_urls_on_dev = true
-include_config_on_deploy = true
-
-[webhooks]
-api_version = "2026-01"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://coloring.pixobe.com/auth/callback",
+  "https://coloring.pixobe.com/auth/shopify/callback",
+  "https://coloring.pixobe.com/api/auth/callback",
+]
+
+[webhooks]
+api_version = "2024-01"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "pixobe.myshopify.com"
+
+
+[app_proxy]
+url = "https://coloring.pixobe.com/"
+subpath = "coloring-app"
+prefix = "apps"
+
+[webhooks.privacy_compliance]
+customer_deletion_url = "https://coloring.pixobe.com/webhooks"
+customer_data_request_url = "https://coloring.pixobe.com/webhooks"
+shop_deletion_url = "https://coloring.pixobe.com/webhooks"
+
+[metaobjects.app.settings]
+name = "Pixobe Coloring Settings"
+display_name_field = "config"
+description = "App settings to persists the Pixobe app defaults used by the Pixobe Coloring application."
+
+[metaobjects.app.settings.access]
+admin = "merchant_read_write"
+storefront = "public_read"
+
+[metaobjects.app.settings.fields.config]
+name = "Settings JSON to store Pixobe Product Coloring app level configuration"
+type = "json"
+description = "Serialized default configuration captured from the settings form."

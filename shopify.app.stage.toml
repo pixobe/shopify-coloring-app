@@ -1,0 +1,59 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "db3852f6280ca8fa87ff24a5b65a24eb"
+name = "Pixobe Coloring (Stage)"
+application_url = "https://mactunnel.pixobe.com"
+embedded = true
+handle = "coloring-app-stage"
+
+[build]
+automatically_update_urls_on_dev = true
+
+[metafields]
+api_version = "2026-01"
+
+[webhooks]
+api_version = "2026-01"
+
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = ["app_purchases_one_time/update", "app_subscriptions/update"]
+uri = "/webhooks/app/subscriptions"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_metaobject_definitions,read_metaobjects,read_translations,write_metaobject_definitions,write_metaobjects"
+
+[auth]
+redirect_urls = ["https://mactunnel.pixobe.com/api/auth"]
+
+[app_proxy]
+url = "https://mactunnel.pixobe.com/api"
+subpath = "pixobe-coloring-app"
+prefix = "apps"
+
+[metaobjects.app.settings]
+name = "Pixobe Coloring Settings"
+display_name_field = "config"
+description = "App settings to persists the Pixobe app defaults used by the Pixobe Coloring application."
+
+[metaobjects.app.settings.access]
+admin = "merchant_read_write"
+storefront = "public_read"
+
+[metaobjects.app.settings.fields.config]
+name = "Settings JSON to store Pixobe Product Coloring app level configuration"
+type = "json"
+description = "Serialized default configuration captured from the settings form."
+
+[metaobjects.app.settings.fields.digest]
+name = "Settings JSON to store Pixobe Product Coloring digest"
+type = "json"
+description = "Data updated from the webhook."

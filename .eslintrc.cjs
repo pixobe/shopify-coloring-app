@@ -74,6 +74,11 @@ module.exports = {
         "plugin:import/recommended",
         "plugin:import/typescript",
       ],
+      rules: {
+        // Allow explicitly specifying `any` where needed. Change to "warn" instead of "off"
+        // if you prefer a softer reminder.
+        "@typescript-eslint/no-explicit-any": "off",
+      },
     },
 
     // Node
@@ -91,6 +96,6 @@ module.exports = {
     },
   ],
   globals: {
-    shopify: "readonly"
+    shopify: "readonly",
   },
 };

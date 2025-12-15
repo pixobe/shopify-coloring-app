@@ -1,21 +1,25 @@
 async function loadColoringApp() {
-  const response = await fetch("/apps/pixobe-coloring-app/config");
-  if (!response.ok) throw new Error("Fetch failed");
-
-  const data = await response.json();
-
-  const {
-    settings = {},
-    digest = "",
-    identifier = "",
-    plan = "",
-    expiry = "",
-  } = data;
-
   const container = document.getElementById("coloring-app-container");
 
-  const src = container.dataset.src;
-  const template = `
+  try {
+    const response = await fetch("/apps/pixobe-coloring-app/config");
+    if (!response.ok) {
+      container.innerHTML =
+        "Unable to load coloring application,please try again later";
+    }
+
+    const data = await response.json();
+
+    const {
+      settings = {},
+      digest = "",
+      identifier = "",
+      plan = "",
+      expiry = "",
+    } = data;
+
+    const src = container.dataset.src;
+    const template = `
     <coloring-app
       src="${src}"
       identifier="${identifier}"
@@ -32,7 +36,12 @@ async function loadColoringApp() {
     ></coloring-app>
   `;
 
-  container.innerHTML = template;
+    container.innerHTML = template;
+  } catch (e) {
+    console.error(e);
+    container.innerHTML =
+      e.message || "Unable to load coloring application,please try again later";
+  }
 }
 
 loadColoringApp().catch(console.error);

@@ -1,13 +1,14 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-name = "Pixobe Coloring"
 client_id = "85deee8bd5bf18a344916cd6acd3f9fd"
+name = "Pixobe Coloring"
 application_url = "https://coloring.pixobe.com/"
 embedded = true
+handle = "pixobe-coloring"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-
+scopes = "read_metaobject_definitions,read_metaobjects,read_translations,write_metaobject_definitions,write_metaobjects"
 
 [auth]
 redirect_urls = [
@@ -23,7 +24,7 @@ api_version = "2024-01"
 embedded = false
 
 [build]
-automatically_update_urls_on_dev = true
+automatically_update_urls_on_dev = false
 dev_store_url = "pixobe.myshopify.com"
 
 

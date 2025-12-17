@@ -61,6 +61,10 @@ function getPlanFromSubscriptions(
     | null
     | undefined,
 ): string {
+  console.log(
+    "Active Subscription ************************************",
+    activeSubscriptions,
+  );
   if (!activeSubscriptions || activeSubscriptions.length === 0) {
     return "Free";
   }
@@ -101,6 +105,8 @@ function getExpiryFromSubscription(
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  console.log("Getting pricing plan for the app******************************");
+
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
 

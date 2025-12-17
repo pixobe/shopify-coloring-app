@@ -6,6 +6,25 @@ application_url = "https://coloring.pixobe.com/"
 embedded = true
 handle = "pixobe-coloring"
 
+[webhooks]
+api_version = "2026-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app_purchases_one_time/update", "app_subscriptions/update" ]
+  uri = "/webhooks/app/subscriptions"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_metaobject_definitions,read_metaobjects,read_translations,write_metaobject_definitions,write_metaobjects"
@@ -14,38 +33,28 @@ scopes = "read_metaobject_definitions,read_metaobjects,read_translations,write_m
 redirect_urls = [
   "https://coloring.pixobe.com/auth/callback",
   "https://coloring.pixobe.com/auth/shopify/callback",
-  "https://coloring.pixobe.com/api/auth/callback",
+  "https://coloring.pixobe.com/api/auth/callback"
 ]
 
-[webhooks]
-api_version = "2024-01"
+[app_proxy]
+url = "https://coloring.pixobe.com/api"
+subpath = "pixobe-coloring-app"
+prefix = "apps"
 
 [pos]
 embedded = false
 
-[build]
-automatically_update_urls_on_dev = false
-dev_store_url = "pixobe.myshopify.com"
-
-
-[app_proxy]
-url = "https://coloring.pixobe.com/"
-subpath = "coloring-app"
-prefix = "apps"
-
-[webhooks.privacy_compliance]
-customer_deletion_url = "https://coloring.pixobe.com/webhooks"
-customer_data_request_url = "https://coloring.pixobe.com/webhooks"
-shop_deletion_url = "https://coloring.pixobe.com/webhooks"
+[metafields]
+api_version = "2026-01"
 
 [metaobjects.app.settings]
 name = "Pixobe Coloring Settings"
 display_name_field = "config"
 description = "App settings to persists the Pixobe app defaults used by the Pixobe Coloring application."
 
-[metaobjects.app.settings.access]
-admin = "merchant_read_write"
-storefront = "public_read"
+  [metaobjects.app.settings.access]
+  admin = "merchant_read_write"
+  storefront = "public_read"
 
 [metaobjects.app.settings.fields.config]
 name = "Settings JSON to store Pixobe Product Coloring app level configuration"

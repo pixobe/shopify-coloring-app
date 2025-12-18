@@ -136,10 +136,9 @@ export default function Index() {
         <s-ordered-list>
           <s-list-item>Open the Theme <s-link href={appUrl} target="_blank">Editor</s-link>.</s-list-item>
           <s-list-item>Select <strong>Add Block</strong> from the left panel.</s-list-item>
-          <s-list-item>Go to <strong>Apps</strong> and click on <strong>Coloring App</strong>.</s-list-item>
+          <s-list-item>Go to <strong>Apps</strong> and select the <strong>Coloring App</strong>.</s-list-item>
           <s-list-item>
-            Select an image using the Image Picker for users to color in the block settings, then save the page.
-          </s-list-item>
+            Once the Coloring App block is added, a settings widget appears in the side panel. From there, use the Image Picker to select the image you want users to color, then save the page.          </s-list-item>
         </s-ordered-list>
       </s-section>
 

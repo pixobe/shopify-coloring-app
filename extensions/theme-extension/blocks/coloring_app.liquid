@@ -1,6 +1,4 @@
 <script src="https://dev.coloring-app.pages.dev/colorgizer/coloring-app.esm.js" type="module" async></script>
-<script src="{{ 'main.js' | asset_url }}" async></script>
-{{ 'main.css' | asset_url | stylesheet_tag }}
 
 {% assign src = block.settings.src | image_url: width: 1080 %}
 {% if src %}
@@ -12,13 +10,11 @@
   </div>
 {% endif %}
 
-Config Data:
-{{ app.metafields.app_config.feature_tier }}
-
 {% schema %}
 {
   "name": "Coloring Canvas",
   "target": "section",
+  "stylesheet": "main.css",
   "settings": [{ "type": "image_picker", "id": "src", "label": "Choose Image" }]
 }
 {% endschema %}

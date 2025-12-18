@@ -19,3 +19,5 @@ export function formDataToJson(
 
   return out;
 }
+
+export const APP_META_FIELD_SUBSCRIPTION_DETAILS = "meta_subscription";

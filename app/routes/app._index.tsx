@@ -10,6 +10,7 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { formDataToJson } from "app/utils/utilis";
 import { getAppMetafield, setAppMetafield } from "app/utils/graphql/app-metadata";
+import { updateSubscriptionMetaDetails } from "app/utils/subscription";
 
 
 const META_CONFIG_KEY = "meta_config";
@@ -20,21 +21,21 @@ const META_CONFIG_KEY = "meta_config";
  */
 async function getDeepLinking(request) {
   const { session } = await authenticate.admin(request);
-  const shop = session.shop; // typically *.myshopify.com
+  const shop = session.shop;
   const apiKey = process.env.SHOPIFY_API_KEY!;
   const appHandle = process.env.APP_HANDLE!;
   const storeHandle = shop.replace(".myshopify.com", "");
-  const embedHandle = "app-embed";
+  const embedHandle = "coloring-app";
   const template = "home";
   const appUrl =
-    `https://${shop}/admin/themes/current/editor` +
-    `?context=apps&template=${encodeURIComponent(template)}` +
-    `&activateAppId=${encodeURIComponent(apiKey)}/${encodeURIComponent(embedHandle)}`;
+    `https://admin.shopify.com/store/${storeHandle}/themes/current/editor` +
+    `?template=${encodeURIComponent(template)}` +
+    `&addAppBlockId=${encodeURIComponent(apiKey)}/${encodeURIComponent(embedHandle)}` +
+    `&target=mainSection`; // Specify where to add it
 
-  const planUrl = `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
-  return { appUrl, planUrl };
+  const pricingUrl = `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
+  return { appUrl, pricingUrl };
 }
-
 
 /**
  * 
@@ -55,12 +56,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       "colors": "#635151,#B57070,#A72F2F,#DC8585"
     };
   }
-  const { planUrl, appUrl } = await getDeepLinking(request);
-  return { settings, planUrl, appUrl };
+  const { pricingUrl, appUrl } = await getDeepLinking(request);
+  return { settings, pricingUrl, appUrl };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = session.shop;
   const formData = await request.formData();
   const configEntries = Array.from(formData.entries()).map(([key, value]) => {
     if (value === "on" || value === "true") {
@@ -74,15 +76,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return [key, value];
   });
   const config = Object.fromEntries(configEntries);
-  console.log("Saving app data", META_CONFIG_KEY, config);
+  // update app meta
+  await updateSubscriptionMetaDetails(admin, shop)
   return setAppMetafield(admin, META_CONFIG_KEY, config);
 };
 
 export default function Index() {
-  const { settings, planUrl, appUrl } = useLoaderData<typeof loader>();
+  const { settings, pricingUrl, appUrl } = useLoaderData<typeof loader>();
 
-  console.log("Settings::::", settings);
-  //nullnull
   // {paint: true, pencil: true, zoom: true, print: true, download: true, …}
 
   const fetcher = useFetcher<{
@@ -127,12 +128,15 @@ export default function Index() {
       <s-button slot="primary-action" href={appUrl} target="_blank" variant="primary">
         Create Coloring page
       </s-button>
+      <s-button slot="secondary-actions" href={pricingUrl} variant="secondary">
+        Upgrade Plan
+      </s-button>
 
       <s-section heading="Getting Started">
         <s-ordered-list>
           <s-list-item>Open the Theme <s-link href={appUrl} target="_blank">Editor</s-link>.</s-list-item>
-          <s-list-item>Select <strong>Add App</strong> from the left panel.</s-list-item>
-          <s-list-item>Choose the <strong>Coloring Book</strong> application and place it where you want the coloring canvas to appear.</s-list-item>
+          <s-list-item>Select <strong>Add Block</strong> from the left panel.</s-list-item>
+          <s-list-item>Go to <strong>Apps</strong> and click on <strong>Coloring App</strong>.</s-list-item>
           <s-list-item>
             Select an image using the Image Picker for users to color in the block settings, then save the page.
           </s-list-item>
@@ -141,11 +145,11 @@ export default function Index() {
 
       <s-section>
         <s-paragraph>
-          You are currently on <s-text type="strong">Free</s-text> plan. <s-link href={planUrl}>Upgrade</s-link> to enjoy the below features.
+          You are currently on <s-text type="strong">Free</s-text> plan. <s-link href={pricingUrl}>Upgrade</s-link> to enjoy all the features listed below.
         </s-paragraph>
       </s-section>
 
-      <s-section heading="Coloring Settings">
+      <s-section heading="Settings">
         <form ref={formRef}>
           <s-stack>
             <s-grid
@@ -157,47 +161,48 @@ export default function Index() {
                   <p-checkbox
                     label="Paint"
                     name="paint"
-                    value={settings?.paint}
+                    value={`${settings?.paint}`}
                   />
                   <p-checkbox
                     label="Pencil"
                     name="pencil"
-                    value={settings?.pencil}
+                    value={`${settings?.pencil}`}
                   />
                   <p-checkbox
                     label="Zoom"
                     name="zoom"
-                    value={settings?.zoom}
+                    value={`${settings?.zoom}`}
                   />
                   <p-checkbox
                     label="Print"
                     name="print"
-                    value={settings?.print}
+                    value={`${settings?.print}`}
                   />
                   <p-checkbox
                     label="Download"
                     name="download"
-                    value={settings?.download}
+                    value={`${settings?.download}`}
                   />
                   <p-checkbox
                     label="Brightness"
                     name="brightness"
-                    value={settings?.brightness}
+                    value={`${settings?.brightness}`}
                   />
+                  <p-colorswatch name="colors" value={settings?.colors} label="Colors"></p-colorswatch>
                 </s-stack>
               </s-grid-item>
-              <s-grid-item>
-                <p-colorswatch name="colors" value={settings?.colors}></p-colorswatch>
-              </s-grid-item>
             </s-grid>
-            <s-button
-              variant="primary"
-              onClick={saveSettings}
-              disabled={isLoading}
-            >
-              Save Settings
-              {isLoading && <s-spinner></s-spinner>}
-            </s-button>
+            <s-grid justifyContent="end">
+              <s-button
+                variant="primary"
+                onClick={saveSettings}
+                disabled={isLoading}
+              >
+                Save Settings
+                {isLoading && <s-spinner></s-spinner>}
+              </s-button>
+            </s-grid>
+
           </s-stack>
         </form>
       </s-section>

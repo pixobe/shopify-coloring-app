@@ -1,3 +1,18 @@
-<div id="coloring-app-container" data-src="{{src}}">
-  <p-spinner></p-spinner>
+{% assign config = app.metafields.app_config.meta_config.value %}
+{% assign subscription = app.metafields.app_config.meta_subscription.value %}
+<div>
+  <coloring-app
+    src="{{ src }}"
+    paint="{{ config.paint }}"
+    pencil="{{ config.pencil }}"
+    zoom="{{ config.zoom }}"
+    print="{{ config.print }}"
+    download="{{ config.download }}"
+    brightness="{{ config.brightness }}"
+    colors="{{ config.colors }}"
+    plan="{{ subscription.plan }}"
+    expiry="{{ subscription.expiry }}"
+    digest="{{ subscription.digest }}"
+    identifier="{{ subscription.identifier }}"
+  ></coloring-app>
 </div>

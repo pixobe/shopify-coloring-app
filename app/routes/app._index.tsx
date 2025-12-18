@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -9,18 +9,10 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { formDataToJson } from "app/utils/utilis";
-import { createLoadColoringSettings, createSaveColoringSettings } from "app/utils/graphql/config-metaobject";
+import { getAppMetafield, setAppMetafield } from "app/utils/graphql/app-metadata";
 
-type SettingsDictionary = Record<string, unknown>;
-const CHECKBOX_FIELDS = [
-  "paint",
-  "pencil",
-  "zoom",
-  "print",
-  "download",
-  "brightness",
-] as const;
 
+const META_CONFIG_KEY = "meta_config";
 /**
  * 
  * @param request 
@@ -40,8 +32,6 @@ async function getDeepLinking(request) {
     `&activateAppId=${encodeURIComponent(apiKey)}/${encodeURIComponent(embedHandle)}`;
 
   const planUrl = `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
-
-  console.log(appUrl, planUrl, "<<<")
   return { appUrl, planUrl };
 }
 
@@ -53,8 +43,18 @@ async function getDeepLinking(request) {
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
-  const loadSettings = createLoadColoringSettings(admin);
-  const settings = await loadSettings();
+  let settings = await getAppMetafield(admin, META_CONFIG_KEY);
+  if (!settings) {
+    settings = {
+      "paint": true,
+      "pencil": true,
+      "zoom": true,
+      "print": true,
+      "download": true,
+      "brightness": true,
+      "colors": "#635151,#B57070,#A72F2F,#DC8585"
+    };
+  }
   const { planUrl, appUrl } = await getDeepLinking(request);
   return { settings, planUrl, appUrl };
 };
@@ -74,14 +74,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return [key, value];
   });
   const config = Object.fromEntries(configEntries);
-  const saveSettings = createSaveColoringSettings(admin);
-  const result = await saveSettings(config);
-
-  return result;
+  console.log("Saving app data", META_CONFIG_KEY, config);
+  return setAppMetafield(admin, META_CONFIG_KEY, config);
 };
 
 export default function Index() {
   const { settings, planUrl, appUrl } = useLoaderData<typeof loader>();
+
+  console.log("Settings::::", settings);
+  //nullnull
+  // {paint: true, pencil: true, zoom: true, print: true, download: true, …}
 
   const fetcher = useFetcher<{
     success?: boolean;
@@ -102,98 +104,6 @@ export default function Index() {
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  const loaderConfig = useMemo(() => {
-    if (
-      settings?.success &&
-      typeof settings.config === "object" &&
-      settings.config !== null
-    ) {
-      return settings.config as SettingsDictionary;
-    }
-    return null;
-  }, [settings]);
-
-  const savedConfig = useMemo(() => {
-    if (
-      fetcher.data &&
-      fetcher.data.success &&
-      typeof fetcher.data.config === "object" &&
-      fetcher.data.config !== null
-    ) {
-      return fetcher.data.config as SettingsDictionary;
-    }
-    return null;
-  }, [fetcher.data]);
-
-  const currentConfig = useMemo<SettingsDictionary>(() => {
-    if (savedConfig) {
-      return savedConfig;
-    }
-
-    if (loaderConfig) {
-      return loaderConfig;
-    }
-
-    return {};
-  }, [loaderConfig, savedConfig]);
-
-  const applyConfigToForm = useCallback(
-    (nextConfig: SettingsDictionary | null) => {
-      if (!formRef.current) {
-        return;
-      }
-
-      const formElement = formRef.current;
-
-      CHECKBOX_FIELDS.forEach((fieldName) => {
-        const checkbox = formElement.querySelector(`[name="${fieldName}"]`) as
-          | (HTMLElement & { checked?: boolean })
-          | null;
-        if (!checkbox) {
-          return;
-        }
-
-        const shouldCheck = Boolean(nextConfig?.[fieldName]);
-        if (shouldCheck) {
-          checkbox.setAttribute("checked", "");
-        } else {
-          checkbox.removeAttribute("checked");
-        }
-
-        if ("checked" in checkbox) {
-          (checkbox as { checked?: boolean }).checked = shouldCheck;
-        }
-      });
-
-      const colorsField = formElement.querySelector('[name="colors"]') as
-        | (HTMLElement & { value?: string })
-        | null;
-      if (colorsField) {
-        const rawValue = nextConfig?.["colors"];
-        const colorsValue = typeof rawValue === "string" ? rawValue : "";
-        colorsField.setAttribute("value", colorsValue);
-
-        if ("value" in colorsField) {
-          (colorsField as { value?: string }).value = colorsValue;
-        }
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    applyConfigToForm(loaderConfig);
-  }, [applyConfigToForm, loaderConfig]);
-
-  useEffect(() => {
-    if (savedConfig) {
-      applyConfigToForm(savedConfig);
-    }
-  }, [applyConfigToForm, savedConfig]);
-
-  const rawColors = currentConfig["colors"];
-  const colorsValue = typeof rawColors === "string" ? rawColors : "";
-
   const saveSettings = () => {
     const data = formDataToJson(new FormData(formRef.current!));
     const config = Object.fromEntries(
@@ -209,15 +119,12 @@ export default function Index() {
         return [k, v];
       }),
     );
-
-    if (formRef.current) {
-      fetcher.submit(config, { method: "POST" });
-    }
+    fetcher.submit(config, { method: "POST" });
   };
 
   return (
     <s-page heading="Pixobe Coloring Book">
-      <s-button slot="primary-action" href={appUrl} target="_blank">
+      <s-button slot="primary-action" href={appUrl} target="_blank" variant="primary">
         Create Coloring page
       </s-button>
 
@@ -241,48 +148,46 @@ export default function Index() {
       <s-section heading="Coloring Settings">
         <form ref={formRef}>
           <s-stack>
-
             <s-grid
               gridTemplateColumns="repeat(2, 1fr)"
               gap="small"
             >
-
               <s-grid-item>
                 <s-stack>
                   <p-checkbox
                     label="Paint"
                     name="paint"
-                    value={settings?.config?.paint}
+                    value={settings?.paint}
                   />
                   <p-checkbox
                     label="Pencil"
                     name="pencil"
-                    value={settings?.config?.pencil}
+                    value={settings?.pencil}
                   />
                   <p-checkbox
                     label="Zoom"
                     name="zoom"
-                    value={settings?.config?.zoom}
+                    value={settings?.zoom}
                   />
                   <p-checkbox
                     label="Print"
                     name="print"
-                    value={settings?.config?.print}
+                    value={settings?.print}
                   />
                   <p-checkbox
                     label="Download"
                     name="download"
-                    value={settings?.config?.download}
+                    value={settings?.download}
                   />
                   <p-checkbox
                     label="Brightness"
                     name="brightness"
-                    value={settings?.config?.brightness}
+                    value={settings?.brightness}
                   />
                 </s-stack>
               </s-grid-item>
               <s-grid-item>
-                <p-colorswatch name="colors" value={colorsValue}></p-colorswatch>
+                <p-colorswatch name="colors" value={settings?.colors}></p-colorswatch>
               </s-grid-item>
             </s-grid>
             <s-button
@@ -303,4 +208,3 @@ export default function Index() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
-

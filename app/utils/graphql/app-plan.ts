@@ -102,7 +102,7 @@ async function createDigest(message: string): Promise<string> {
  */
 export async function getAppSubscriptionDetails(
   admin: any,
-  identifier: string,
+  shop: string,
 ): Promise<{
   plan: string;
   expiry: string;
@@ -120,7 +120,7 @@ export async function getAppSubscriptionDetails(
         planData.data.currentAppInstallation.activeSubscriptions;
       plan = getPlanFromSubscriptions(activeSubscriptions);
       expiry = getExpiryFromSubscription(activeSubscriptions);
-      digest = await createDigest(`${identifier}${APP_NAME}${plan}${expiry}`);
+      digest = await createDigest(`${shop}${APP_NAME}${plan}${expiry}`);
     }
   } catch (error) {
     console.warn(
@@ -128,5 +128,5 @@ export async function getAppSubscriptionDetails(
       error instanceof Error ? error.message : "Unknown error",
     );
   }
-  return { plan, expiry, digest, identifier };
+  return { plan, expiry, digest, identifier: shop };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -11,6 +11,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { formDataToJson } from "app/utils/utilis";
 import { getAppMetafield, setAppMetafield } from "app/utils/graphql/app-metadata";
 import { updateSubscriptionMetaDetails } from "app/utils/subscription";
+import { getAppSubscriptionDetails } from "app/utils/graphql/app-plan";
 
 
 const META_CONFIG_KEY = "meta_config";
@@ -43,7 +44,14 @@ async function getDeepLinking(request) {
  * @returns 
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+
+  const shop = session.shop;
+
+  if (!shop) {
+    throw new Error("Unauthorized");
+  }
+
   let settings = await getAppMetafield(admin, META_CONFIG_KEY);
   if (!settings) {
     settings = {
@@ -56,8 +64,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       "colors": "#635151,#B57070,#A72F2F,#DC8585"
     };
   }
-  const { pricingUrl, appUrl } = await getDeepLinking(request);
-  return { settings, pricingUrl, appUrl };
+  const deepLinks = await getDeepLinking(request);
+  const subscription = await getAppSubscriptionDetails(admin, shop)
+  return { settings, deepLinks, subscription };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -82,7 +91,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
-  const { settings, pricingUrl, appUrl } = useLoaderData<typeof loader>();
+  const { settings, deepLinks, subscription } = useLoaderData<typeof loader>();
 
   // {paint: true, pencil: true, zoom: true, print: true, download: true, …}
 
@@ -125,16 +134,16 @@ export default function Index() {
 
   return (
     <s-page heading="Pixobe Coloring Book">
-      <s-button slot="primary-action" href={appUrl} target="_blank" variant="primary">
+      <s-button slot="primary-action" href={deepLinks.appUrl} target="_blank" variant="primary">
         Create Coloring page
       </s-button>
-      <s-button slot="secondary-actions" href={pricingUrl} variant="secondary">
+      <s-button slot="secondary-actions" href={deepLinks.pricingUrl} variant="secondary">
         Free Trial
       </s-button>
 
       <s-section heading="Getting Started">
         <s-ordered-list>
-          <s-list-item>Open the Theme <s-link href={appUrl} target="_blank">Editor</s-link>.</s-list-item>
+          <s-list-item>Open the Theme <s-link href={deepLinks.appUrl} target="_blank">Editor</s-link>.</s-list-item>
           <s-list-item>Select <strong>Add Block</strong> from the left panel.</s-list-item>
           <s-list-item>Go to <strong>Apps</strong> and select the <strong>Coloring App</strong>.</s-list-item>
           <s-list-item>
@@ -142,11 +151,16 @@ export default function Index() {
         </s-ordered-list>
       </s-section>
 
-      <s-section>
-        <s-paragraph>
-          You are currently on <s-text type="strong">Free</s-text> plan. <s-link href={pricingUrl}>Upgrade</s-link> to enjoy all the features listed below.
-        </s-paragraph>
-      </s-section>
+
+      {
+        subscription.plan === 'Free' &&
+        <s-section>
+          <s-paragraph>
+            You are currently on <s-text type="strong">Free</s-text> plan. <s-link href={deepLinks.pricingUrl}>Upgrade</s-link> to enjoy all the features listed below.
+          </s-paragraph>
+        </s-section>
+      }
+
 
       <s-section heading="Settings">
         <form ref={formRef}>

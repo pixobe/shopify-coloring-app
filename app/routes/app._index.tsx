@@ -129,7 +129,7 @@ export default function Index() {
         Create Coloring page
       </s-button>
       <s-button slot="secondary-actions" href={pricingUrl} variant="secondary">
-        Upgrade Plan
+        Free Trial
       </s-button>
 
       <s-section heading="Getting Started">
